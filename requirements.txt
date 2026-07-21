@@ -1,0 +1,8 @@
+pyserial
+numpy
+PyQt6
+pyqtgraph
+keyboard
+pandas
+scipy
+c3d
