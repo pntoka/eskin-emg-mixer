@@ -14,9 +14,11 @@ src/
   emg/                   # drives EMG_Eyetracker_Tool.exe via simulated F5/F6 hotkeys
   recording/              # SessionRecorder + the grasp-trial state machine
   gui/                    # live heatmap/force plot + task-guided recording GUI
-  processing/             # offline feature extraction (forces, e-skin, EMG c3d, correlation)
+  processing/             # offline: loaders/features (forces, e-skin, EMG c3d + txt),
+                          #   per-trial alignment (align.py), plots (trial_plots.py), correlation
 scripts/
-  run_gui.py               # entry point
+  run_gui.py               # recording GUI entry point
+  align_trial.py           # offline: align + plot a recorded trial (see docs/alignment_pipeline.md)
 ```
 
 ## Setup
@@ -60,6 +62,23 @@ python -m scripts.run_gui COM3 COM4        # override ports explicitly
 Recorded trials are written under `data/<trial_id>/`: `eskin.csv`, `forces.csv`,
 `emg_raw.txt` (if `EMG_Eyetracker_Tool.exe` was running), and `manifest.json`
 tying them together with the task parameters and start/stop timestamps.
+
+### Aligning a recorded trial (offline)
+
+Time-align a trial's e-skin, force, and EMG streams onto one axis (native rates,
+no fusion), with per-rep e-skin ROI and EMG channel auto-selection, and save
+overview + per-rep-ROI plots:
+
+```
+python -m scripts.align_trial data/<trial_id>     # one trial
+python -m scripts.align_trial data                 # every trial folder under data/
+python -m scripts.align_trial data --no-plot       # text report only
+python -m scripts.align_trial data --dump          # also write <trial>/aligned/*.csv
+```
+
+Force is merged as `F1 + F2` (total grasp force); e-skin is summed over an
+auto-detected per-rep contact ROI. Full method and a pipeline diagram:
+[`docs/alignment_pipeline.md`](docs/alignment_pipeline.md).
 
 ## Status
 
