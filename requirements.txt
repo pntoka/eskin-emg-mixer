@@ -6,3 +6,4 @@ keyboard
 pandas
 scipy
 c3d
+matplotlib
