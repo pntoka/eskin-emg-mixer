@@ -1,0 +1,43 @@
+{
+  "trial_id": "PT_target_30_002_20260722_153507",
+  "subject_id": "PT_target_30",
+  "task_kind": "target_force",
+  "duration_s": 5.0,
+  "repetitions_total": 5,
+  "rest_s": 5.0,
+  "repetitions": [
+    {
+      "rep": 1,
+      "start_wall_time": "2026-07-22T15:35:15.612",
+      "end_wall_time": "2026-07-22T15:35:20.668"
+    },
+    {
+      "rep": 2,
+      "start_wall_time": "2026-07-22T15:35:31.848",
+      "end_wall_time": "2026-07-22T15:35:36.876"
+    },
+    {
+      "rep": 3,
+      "start_wall_time": "2026-07-22T15:35:46.567",
+      "end_wall_time": "2026-07-22T15:35:51.685"
+    },
+    {
+      "rep": 4,
+      "start_wall_time": "2026-07-22T15:36:02.422",
+      "end_wall_time": "2026-07-22T15:36:07.497"
+    },
+    {
+      "rep": 5,
+      "start_wall_time": "2026-07-22T15:36:17.461",
+      "end_wall_time": "2026-07-22T15:36:22.523"
+    }
+  ],
+  "target_force_n": 30.0,
+  "tolerance_n": 1.5,
+  "aborted": false,
+  "start_wall_time": "2026-07-22T15:35:15.621",
+  "stop_wall_time": "2026-07-22T15:36:22.523",
+  "eskin_csv": "C:\\Users\\piotr\\Documents\\GitHub\\robotics-summer-school\\data\\PT_target_30_002_20260722_153507\\eskin.csv",
+  "forces_csv": "C:\\Users\\piotr\\Documents\\GitHub\\robotics-summer-school\\data\\PT_target_30_002_20260722_153507\\forces.csv",
+  "emg_txt": "C:\\Users\\piotr\\Documents\\GitHub\\robotics-summer-school\\data\\PT_target_30_002_20260722_153507\\emg_raw.txt"
+}
