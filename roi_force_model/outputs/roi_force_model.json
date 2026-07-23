@@ -1,0 +1,103 @@
+{
+  "model": "ridge-poly2 on e-skin ROI features -> F1+F2 (Newtons)",
+  "base_features": [
+    "roi_mean",
+    "roi_area",
+    "roi_peak",
+    "roi_p90"
+  ],
+  "expanded_features": [
+    "roi_mean",
+    "roi_area",
+    "roi_peak",
+    "roi_p90",
+    "roi_mean^2",
+    "roi_area^2",
+    "roi_peak^2",
+    "roi_p90^2",
+    "roi_mean*roi_area",
+    "roi_mean*roi_peak",
+    "roi_mean*roi_p90",
+    "roi_area*roi_peak",
+    "roi_area*roi_p90",
+    "roi_peak*roi_p90"
+  ],
+  "alpha": 0.03162277660168379,
+  "scaler_mean": [
+    123.48072228471867,
+    159.62921251348436,
+    309.6001554319756,
+    215.98065741494528,
+    22249.62230811815,
+    33833.57682847897,
+    114368.2833868866,
+    64899.446883810415,
+    27198.271878425137,
+    46365.90886764851,
+    37613.544047437994,
+    59589.10816078763,
+    46746.52673786176,
+    82218.04175025571
+  ],
+  "scaler_scale": [
+    83.67875197541248,
+    91.38977700378877,
+    136.07360928334737,
+    135.0992320719031,
+    17140.38193984542,
+    22834.362427342556,
+    71185.07729052172,
+    44220.97746247661,
+    19707.17524630305,
+    30966.89805127795,
+    27022.092545141342,
+    36748.95079978225,
+    31706.04036585445,
+    52918.52567350554
+  ],
+  "coef": [
+    74.19489064479014,
+    11.773941477023195,
+    -1.2969959603443109,
+    -52.68718479718268,
+    -36.804137080355716,
+    -24.790407613905135,
+    -0.7973550926246522,
+    -89.8560974000615,
+    -47.65086324587311,
+    -97.17304900410139,
+    151.66987270384183,
+    0.3088912883211979,
+    55.75613023371774,
+    67.21038409212429
+  ],
+  "intercept": 8.882693458468179,
+  "preprocessing": {
+    "1_align": "average e-skin frames onto the 100 Hz force grid",
+    "2_baseline": "subtract per-taxel 5.0th-percentile (per trial), clip>=0",
+    "3_roi": "detect_roi: largest connected cluster of high-peak cells",
+    "4_features": "ROI mean/area/peak/p90, then degree-2 poly + this scaler",
+    "note": "baseline + ROI are re-estimated per trial at inference time"
+  },
+  "contact_thr": 5.0,
+  "trained_on": "YL_grasp_dynamic_002_20260723_155859",
+  "train_filter": "F1+F2 < 30 N (saturated samples dropped)",
+  "n_samples": 23175,
+  "alpha_selected": 0.03162277660168379,
+  "valid_range_N": [
+    null,
+    30.0
+  ],
+  "saturation_gate": {
+    "feature": "roi_mean",
+    "threshold": 203.2,
+    "rule": "roi_mean >= threshold => saturated, force unresolved"
+  },
+  "eval_heldout_gate_accepted": {
+    "r2": 0.6916,
+    "rmse": 9.449,
+    "mae": 6.61,
+    "n": 7871
+  },
+  "target": "F1_N + F2_N (Newtons)"
+}
