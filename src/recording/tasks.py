@@ -24,6 +24,17 @@ the successful, fully in-band hold windows. MAX_EFFORT tasks have no
 target/tolerance concept and skip straight from COUNTDOWN/REST to HOLD as
 before, with recording starting at rep 1's HOLD and running continuously
 (including REST) like today.
+
+EMG capture mirrors this per-task-kind split. MAX_EFFORT keeps one
+continuous whole-trial capture (started/stopped once, alongside
+start_trial/stop_trial), same as eskin/force. TARGET_FORCE instead captures
+EMG per hold ATTEMPT: the EMG start hotkey fires at the beginning of every
+HOLD (including retries of the same rep) and the stop hotkey at its end, so
+each capture stays short regardless of how long a rep's STABILIZING retries
+take -- this avoids overrunning the EMG tool's in-memory recording buffer on
+long, retry-heavy trials. A failed attempt's EMG is discarded exactly like
+its eskin/force frames; only the successful attempt's capture is linked into
+the trial folder, one file per completed rep.
 """
 
 import time
@@ -38,6 +49,7 @@ from PyQt6 import QtCore
 class TaskKind(Enum):
     MAX_EFFORT = "max_effort"
     TARGET_FORCE = "target_force"
+    FREE_FORM = "free_form"
 
 
 @dataclass
@@ -192,24 +204,31 @@ class TrialController(QtCore.QObject):
             self._recorder.start_trial(self._trial_id, self._task, self._subject_id)
         if self._task.kind == TaskKind.TARGET_FORCE:
             self._recorder.resume_recording()
+            self._recorder.begin_emg_segment()
 
     def _abort_hold_attempt(self, combined_force_n: float):
         """Force drifted out of tolerance mid-HOLD: discard this attempt's
         buffered frames and retry the same repetition from STABILIZING."""
         self._recorder.discard_current_segment()
+        self._recorder.discard_emg_segment()
         self._inband_since = None
         self._set_state(TrialState.STABILIZING)
         self.stabilize_tick.emit(0.0, False, combined_force_n)
 
     def _end_hold(self):
+        emg_path = None
         if self._task.kind == TaskKind.TARGET_FORCE:
             self._recorder.pause_recording()
+            emg_path = self._recorder.end_emg_segment(self._rep_index)
         rep_end_wall = datetime.now()
-        self._rep_marks.append({
+        rep_mark = {
             "rep": self._rep_index,
             "start_wall_time": self._rep_start_wall.isoformat(timespec="milliseconds"),
             "end_wall_time": rep_end_wall.isoformat(timespec="milliseconds"),
-        })
+        }
+        if self._task.kind == TaskKind.TARGET_FORCE:
+            rep_mark["emg_txt"] = str(emg_path) if emg_path else None
+        self._rep_marks.append(rep_mark)
         if self._rep_index < self._task.repetitions:
             self._set_state(TrialState.REST)
             self._phase_start = time.monotonic()
@@ -218,6 +237,13 @@ class TrialController(QtCore.QObject):
 
     def _finish(self, aborted: bool):
         self._timer.stop()
+        if (aborted and self.state == TrialState.HOLD and self._task is not None
+                and self._task.kind == TaskKind.TARGET_FORCE and self._recorder.recording):
+            # Abort landed mid hold-attempt, before _end_hold/_abort_hold_attempt
+            # ever ran for it -- close the dangling EMG capture (start hotkey
+            # already fired, no matching stop yet) so it doesn't bleed into
+            # the next trial's capture.
+            self._recorder.discard_emg_segment()
         manifest = None
         if self._recorder.recording:
             manifest = self._recorder.stop_trial(aborted=aborted, repetitions=self._rep_marks)

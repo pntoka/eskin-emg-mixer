@@ -19,7 +19,7 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 
 from .align import AlignedTrial, ENV_WINDOW_S, GAP_THRESHOLD_S
-from .emg_c3d import rms_envelope
+from .emg_txt import rms_envelope, EMG_ACTIVE_CHANNELS
 
 
 def _with_gaps(t: np.ndarray, y: np.ndarray, gap_s: float = GAP_THRESHOLD_S):
@@ -47,11 +47,23 @@ def plot_overview(trial: AlignedTrial, out_path: Path) -> Path:
                     va="top", transform=ax_emg.get_xaxis_transform(),
                     fontsize=8, color="0.4")
 
-    # EMG envelope (selected channels only)
-    if trial.emg_present and trial.emg_selected:
-        for ch in trial.emg_selected:
+    # EMG envelope -- the two known-wired channels (EMG_ACTIVE_CHANNELS), not
+    # trial.emg_selected: that heuristic's rep-correlation check always reads
+    # 0 for per-rep-captured target_force trials (no in-file rest sample), so
+    # it degenerates to an arbitrary single-channel pick for that shape.
+    active_channels = [ch for ch in EMG_ACTIVE_CHANNELS if ch < trial.emg.shape[0]]
+    if trial.emg_present and active_channels:
+        for ch in active_channels:
             env = rms_envelope(trial.emg[ch], trial.sample_rate_hz, ENV_WINDOW_S)
-            ax_emg.plot(trial.emg_t, env, lw=0.8, label=trial.emg_channel_names[ch])
+            et, ey = _with_gaps(trial.emg_t, env)
+            ax_emg.plot(et, ey, lw=0.8, label=trial.emg_channel_names[ch])
+        # Per-rep onset marker: solid = detected (trims the reaction-time
+        # lead-in), dotted = fallback to the rep's nominal start (no in-file
+        # rest baseline to detect onset against, e.g. target_force reps).
+        for i, (_, onset_s, onset_detected) in enumerate(trial.rep_onsets):
+            ax_emg.axvline(onset_s, color="tab:red", lw=1.0,
+                            ls="-" if onset_detected else ":", alpha=0.8,
+                            label="rep onset" if i == 0 else None)
         ax_emg.legend(loc="upper right", fontsize=8)
     else:
         ax_emg.text(0.5, 0.5, "no EMG", ha="center", va="center",

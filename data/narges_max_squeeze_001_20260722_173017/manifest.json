@@ -1,0 +1,33 @@
+{
+  "trial_id": "narges_max_squeeze_001_20260722_173017",
+  "subject_id": "narges_max_squeeze",
+  "task_kind": "max_effort",
+  "duration_s": 5.0,
+  "repetitions_total": 3,
+  "rest_s": 5.0,
+  "repetitions": [
+    {
+      "rep": 1,
+      "start_wall_time": "2026-07-22T17:30:20.560",
+      "end_wall_time": "2026-07-22T17:30:25.641"
+    },
+    {
+      "rep": 2,
+      "start_wall_time": "2026-07-22T17:30:30.664",
+      "end_wall_time": "2026-07-22T17:30:35.712"
+    },
+    {
+      "rep": 3,
+      "start_wall_time": "2026-07-22T17:30:40.763",
+      "end_wall_time": "2026-07-22T17:30:45.756"
+    }
+  ],
+  "target_force_n": null,
+  "tolerance_n": null,
+  "aborted": false,
+  "start_wall_time": "2026-07-22T17:30:20.560",
+  "stop_wall_time": "2026-07-22T17:30:45.758",
+  "eskin_csv": "C:\\Users\\piotr\\Documents\\GitHub\\robotics-summer-school\\data\\narges_max_squeeze_001_20260722_173017\\eskin.csv",
+  "forces_csv": "C:\\Users\\piotr\\Documents\\GitHub\\robotics-summer-school\\data\\narges_max_squeeze_001_20260722_173017\\forces.csv",
+  "emg_txt": "C:\\Users\\piotr\\Documents\\GitHub\\robotics-summer-school\\data\\narges_max_squeeze_001_20260722_173017\\emg_raw.txt"
+}

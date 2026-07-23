@@ -1,0 +1,43 @@
+{
+  "trial_id": "PT_max_squeeze_001_20260722_153104",
+  "subject_id": "PT_max_squeeze",
+  "task_kind": "max_effort",
+  "duration_s": 5.0,
+  "repetitions_total": 5,
+  "rest_s": 5.0,
+  "repetitions": [
+    {
+      "rep": 1,
+      "start_wall_time": "2026-07-22T15:31:07.323",
+      "end_wall_time": "2026-07-22T15:31:12.377"
+    },
+    {
+      "rep": 2,
+      "start_wall_time": "2026-07-22T15:31:17.423",
+      "end_wall_time": "2026-07-22T15:31:22.460"
+    },
+    {
+      "rep": 3,
+      "start_wall_time": "2026-07-22T15:31:27.488",
+      "end_wall_time": "2026-07-22T15:31:32.545"
+    },
+    {
+      "rep": 4,
+      "start_wall_time": "2026-07-22T15:31:37.606",
+      "end_wall_time": "2026-07-22T15:31:42.651"
+    },
+    {
+      "rep": 5,
+      "start_wall_time": "2026-07-22T15:31:47.693",
+      "end_wall_time": "2026-07-22T15:31:52.736"
+    }
+  ],
+  "target_force_n": null,
+  "tolerance_n": null,
+  "aborted": false,
+  "start_wall_time": "2026-07-22T15:31:07.323",
+  "stop_wall_time": "2026-07-22T15:31:52.736",
+  "eskin_csv": "C:\\Users\\piotr\\Documents\\GitHub\\robotics-summer-school\\data\\PT_max_squeeze_001_20260722_153104\\eskin.csv",
+  "forces_csv": "C:\\Users\\piotr\\Documents\\GitHub\\robotics-summer-school\\data\\PT_max_squeeze_001_20260722_153104\\forces.csv",
+  "emg_txt": "C:\\Users\\piotr\\Documents\\GitHub\\robotics-summer-school\\data\\PT_max_squeeze_001_20260722_153104\\emg_raw.txt"
+}

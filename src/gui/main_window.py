@@ -13,6 +13,7 @@ from PyQt6.QtGui import QFont
 
 from ..recording.session import SessionRecorder
 from ..recording.tasks import TaskKind, TaskSpec, TrialController, TrialState
+from ..sensors import forces as forces_module
 from ..sensors.forces import FORCE_PLOT_WINDOW_S, READ_RATE_HZ
 from .task_feedback import TaskFeedbackWidget
 
@@ -87,6 +88,7 @@ class MainWindow(QtWidgets.QMainWindow):
         self.recorder.eskin_frame.connect(self._update_heatmap)
         self.recorder.force_frame.connect(self._update_forces)
         self.recorder.calibration_ready.connect(self._on_calibration_ready)
+        self.recorder.forces_thread.bias_calibrated.connect(self._on_bias_calibrated)
 
         self.controller = TrialController(self.recorder)
         self.controller.state_changed.connect(self._on_state_changed)
@@ -99,6 +101,8 @@ class MainWindow(QtWidgets.QMainWindow):
 
         self._hold_remaining = 0.0
         self._trial_counter = 0
+        self._simple_recording = False
+        self._calibrating_bias = False
 
         hist_len = max(2, int(FORCE_PLOT_WINDOW_S * READ_RATE_HZ))
         self._force_t = deque(maxlen=hist_len)
@@ -143,6 +147,13 @@ class MainWindow(QtWidgets.QMainWindow):
 
         # --- Right: trial controls + task feedback ----------------------------
         right = QtWidgets.QVBoxLayout()
+
+        self._calib_btn = QtWidgets.QPushButton("Calibrate Zero (1s)")
+        self._calib_btn.setToolTip(
+            "Re-measure the force-sensor zero bias. Do not touch the "
+            "sensors while it runs.")
+        self._calib_btn.clicked.connect(self._on_calibrate_zero_clicked)
+        right.addWidget(self._calib_btn)
 
         form = QtWidgets.QFormLayout()
         self._subject_edit = QtWidgets.QLineEdit("P1")
@@ -192,6 +203,15 @@ class MainWindow(QtWidgets.QMainWindow):
         self._start_btn.clicked.connect(self._on_start_clicked)
         right.addWidget(self._start_btn)
 
+        self._simple_rec_btn = QtWidgets.QPushButton("Start Simple Recording")
+        self._simple_rec_btn.setToolTip(
+            "Plain start/stop recording with no task structure (no "
+            "countdown, reps, or target force) -- mirrors the legacy "
+            "archive recorder. Uses the Subject/Participant ID above.")
+        self._simple_rec_btn.setEnabled(False)
+        self._simple_rec_btn.clicked.connect(self._on_simple_rec_clicked)
+        right.addWidget(self._simple_rec_btn)
+
         self._feedback = TaskFeedbackWidget()
         right.addWidget(self._feedback)
 
@@ -205,8 +225,8 @@ class MainWindow(QtWidgets.QMainWindow):
     # ------------------------------------------------------------------
 
     def _on_calibration_ready(self):
-        self._start_btn.setEnabled(True)
         self._status.setText("Live")
+        self._apply_control_gating()
 
     def _update_heatmap(self, data):
         self._hmap.update_data(data)
@@ -259,8 +279,7 @@ class MainWindow(QtWidgets.QMainWindow):
         active = state in (TrialState.COUNTDOWN, TrialState.STABILIZING,
                            TrialState.HOLD, TrialState.REST)
         self._start_btn.setText("Abort Trial" if active else "Start Trial")
-        self._start_btn.setEnabled(active or self.recorder.calibrated)
-        self._set_form_enabled(state == TrialState.IDLE)
+        self._apply_control_gating()
 
     def _set_form_enabled(self, enabled):
         self._subject_edit.setEnabled(enabled)
@@ -271,6 +290,23 @@ class MainWindow(QtWidgets.QMainWindow):
         is_target = self._task_combo.currentData() == TaskKind.TARGET_FORCE
         self._target_spin.setEnabled(enabled and is_target)
         self._tolerance_spin.setEnabled(enabled and is_target)
+
+    def _apply_control_gating(self):
+        """Single source of truth for button/form enabled-states across the
+        three mutually-exclusive activities: a controller-driven trial
+        (Max Effort/Target Force), simple free-form recording, and on-demand
+        force zero-bias calibration."""
+        trial_active = self.controller.state != TrialState.IDLE
+        calibrated = self.recorder.calibrated
+        idle_and_free = (not trial_active) and (not self._simple_recording) \
+            and (not self._calibrating_bias)
+
+        self._start_btn.setEnabled(trial_active or (calibrated and idle_and_free))
+        self._simple_rec_btn.setEnabled(
+            self._simple_recording
+            or (calibrated and not trial_active and not self._calibrating_bias))
+        self._calib_btn.setEnabled(idle_and_free)
+        self._set_form_enabled(self.controller.state == TrialState.IDLE and idle_and_free)
 
     def _on_countdown_tick(self, seconds_remaining):
         self._feedback.set_countdown(seconds_remaining)
@@ -298,10 +334,61 @@ class MainWindow(QtWidgets.QMainWindow):
             f"{'Aborted' if aborted else 'Saved'} trial '{manifest['trial_id']}' -> {session_dir}")
 
     # ------------------------------------------------------------------
+    # Simple/free-form recording (mirrors the legacy archive recorder's
+    # plain Start/Stop Recording -- no countdown/reps/target, just a
+    # manifest with subject_id + task_kind="free_form" so metadata is
+    # captured automatically instead of a manual log).
+    # ------------------------------------------------------------------
+
+    def _on_simple_rec_clicked(self):
+        if not self._simple_recording:
+            self._trial_counter += 1
+            subject = self._subject_edit.text().strip() or "subject"
+            trial_id = f"{subject}_{self._trial_counter:03d}_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
+            task = TaskSpec(kind=TaskKind.FREE_FORM, duration_s=0.0)
+            self.recorder.start_trial(trial_id, task, subject_id=subject)
+            self._simple_recording = True
+            self._simple_rec_btn.setText("Stop Simple Recording")
+            self._status.setText(f"Recording (simple) '{trial_id}'...")
+        else:
+            manifest = self.recorder.stop_trial(aborted=False)
+            self._simple_recording = False
+            self._simple_rec_btn.setText("Start Simple Recording")
+            self._on_trial_finished(manifest)
+        self._apply_control_gating()
+
+    # ------------------------------------------------------------------
+    # Force zero-bias calibration ("Calibrate Zero" button)
+    # ------------------------------------------------------------------
+
+    def _on_calibrate_zero_clicked(self):
+        if self.controller.state != TrialState.IDLE or self._simple_recording:
+            self._status.setText("Stop recording before calibrating zero bias.")
+            return
+        self._calibrating_bias = True
+        self._calib_btn.setText("Calibrating...")
+        self._status.setText(
+            "Calibrating force-sensor zero bias -- do NOT touch the sensors (1s)...")
+        self._apply_control_gating()
+        self.recorder.forces_thread.request_bias_calibration()
+
+    def _on_bias_calibrated(self, bias1, bias2):
+        forces_module.BIAS1, forces_module.BIAS2 = bias1, bias2
+        forces_module.save_force_bias(bias1, bias2)
+        self._calibrating_bias = False
+        self._calib_btn.setText("Calibrate Zero (1s)")
+        self._status.setText(
+            f"Zero bias calibrated: BIAS1={bias1:+.4f} N  BIAS2={bias2:+.4f} N "
+            f"(saved to {forces_module.BIAS_CALIBRATION_FILE})")
+        self._apply_control_gating()
+
+    # ------------------------------------------------------------------
     # Window lifecycle
     # ------------------------------------------------------------------
 
     def closeEvent(self, event):
+        if self._simple_recording:
+            self.recorder.stop_trial(aborted=False)
         if self.controller.state != TrialState.IDLE:
             self.controller.abort()
         self.recorder.stop_threads()

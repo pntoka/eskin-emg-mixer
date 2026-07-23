@@ -1,0 +1,24 @@
+========================================================================
+CROSS-TRIAL FORCE / E-SKIN / EMG RELATIONSHIP
+========================================================================
+
+Trials: 6   Reps: 27   Pooled samples: 34580
+Reps per target force (NaN = max-effort):
+    15.0: 5
+    30.0: 5
+    45.0: 5
+    60.0: 5
+    75.0: 2
+    nan: 5
+
+Correlations (dropping NaN rows):
+  rep-level  force vs eskin_roi_mean: n=27  Pearson r=+0.560 (p=0.0024)  Spearman rho=+0.449 (p=0.019)
+  rep-level  force vs emg_env_mean: n=13  Pearson r=-0.434 (p=0.14)  Spearman rho=-0.418 (p=0.16)
+  pooled     force vs eskin_roi: n=34580  Pearson r=+0.725 (p=0)  Spearman rho=+0.898 (p=0)
+      -> Spearman notably exceeds Pearson (gap +0.173): consistent with a saturating, non-linear-but-monotonic relationship.
+  pooled     force vs emg_env: n=28268  Pearson r=-0.079 (p=2.1e-40)  Spearman rho=+0.074 (p=2.5e-35)
+      -> Spearman notably exceeds Pearson (gap +0.153): consistent with a saturating, non-linear-but-monotonic relationship.
+
+Saturation-knee estimates (binned-slope method):
+  e-skin ROI: knee ~ 47.5 N  (max slope 5.72e+03/N at 2.5 N, threshold 20% of max, bin width 5.0 N)
+  EMG envelope: knee ~ 77.5 N  (max slope 281/N at 62.5 N, threshold 20% of max, bin width 5.0 N)

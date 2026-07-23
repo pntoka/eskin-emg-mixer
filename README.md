@@ -36,7 +36,12 @@ A recorded trial, `data/<trial_id>/`:
 manifest.json   task, subject, per-rep windows, start/stop timestamps
 eskin.csv       wall_time, elapsed_s, 256 taxel columns (R00_C00..R15_C15)
 forces.csv      wall_time, elapsed_s, F1_N, F2_N
-emg_raw.txt     raw WaveX EMG (present only if the EMG tool was running)
+emg_raw.txt     raw WaveX EMG for the whole trial (max_effort trials, if the
+                EMG tool was running)
+emg_rep{N}.txt  raw WaveX EMG for one successfully-completed rep (target_force
+                trials instead capture EMG per hold attempt, one short file per
+                rep, to avoid overrunning the EMG tool's recording buffer on
+                long/retry-heavy trials -- see docs/alignment_pipeline.md)
 ```
 
 ## Quickstart
@@ -98,9 +103,10 @@ python -m scripts.run_gui COM3 COM4        # override ports explicitly
 
 The GUI shows a live e-skin heatmap + force plot and guides you through each
 task's reps. Recorded trials are written under `data/<trial_id>/` (see the
-layout above): `eskin.csv`, `forces.csv`, `emg_raw.txt` (if the EMG tool was
-running), and `manifest.json` tying them together with the task parameters and
-per-rep start/stop timestamps.
+layout above): `eskin.csv`, `forces.csv`, EMG (`emg_raw.txt` for max_effort,
+`emg_rep{N}.txt` per rep for target_force, if the EMG tool was running), and
+`manifest.json` tying them together with the task parameters and per-rep
+start/stop timestamps.
 
 ## Aligning & plotting (offline)
 

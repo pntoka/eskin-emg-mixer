@@ -1,0 +1,36 @@
+{
+  "trial_id": "narges_target_15_003_20260722_173534",
+  "subject_id": "narges_target_15",
+  "task_kind": "target_force",
+  "duration_s": 5.0,
+  "repetitions_total": 3,
+  "rest_s": 5.0,
+  "repetitions": [
+    {
+      "rep": 1,
+      "start_wall_time": "2026-07-22T17:35:50.636",
+      "end_wall_time": "2026-07-22T17:35:56.683",
+      "emg_txt": "C:\\Users\\piotr\\Documents\\GitHub\\robotics-summer-school\\data\\narges_target_15_003_20260722_173534\\emg_rep1.txt"
+    },
+    {
+      "rep": 2,
+      "start_wall_time": "2026-07-22T17:36:17.428",
+      "end_wall_time": "2026-07-22T17:36:22.910",
+      "emg_txt": "C:\\Users\\piotr\\Documents\\GitHub\\robotics-summer-school\\data\\narges_target_15_003_20260722_173534\\emg_rep2.txt"
+    },
+    {
+      "rep": 3,
+      "start_wall_time": "2026-07-22T17:36:33.473",
+      "end_wall_time": "2026-07-22T17:36:38.759",
+      "emg_txt": "C:\\Users\\piotr\\Documents\\GitHub\\robotics-summer-school\\data\\narges_target_15_003_20260722_173534\\emg_rep3.txt"
+    }
+  ],
+  "target_force_n": 15.0,
+  "tolerance_n": 2.0,
+  "aborted": false,
+  "start_wall_time": "2026-07-22T17:35:42.268",
+  "stop_wall_time": "2026-07-22T17:36:38.759",
+  "eskin_csv": "C:\\Users\\piotr\\Documents\\GitHub\\robotics-summer-school\\data\\narges_target_15_003_20260722_173534\\eskin.csv",
+  "forces_csv": "C:\\Users\\piotr\\Documents\\GitHub\\robotics-summer-school\\data\\narges_target_15_003_20260722_173534\\forces.csv",
+  "emg_txt": null
+}

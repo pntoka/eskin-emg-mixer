@@ -16,7 +16,7 @@ from PyQt6 import QtCore
 from ..emg import hotkey_trigger, session_linker
 from ..sensors.eskin import ESKIN_TARE_SAMPLES, EskinReader, remap
 from ..sensors.forces import ForceReader
-from .tasks import TaskSpec
+from .tasks import TaskKind, TaskSpec
 
 DEFAULT_DATA_DIR = Path(__file__).resolve().parents[2] / "data"
 
@@ -56,6 +56,7 @@ class SessionRecorder(QtCore.QObject):
         self._subject_id = ""
         self._start_wall_time: Optional[datetime] = None
         self._start_time_monotonic: Optional[float] = None
+        self._emg_segment_start_monotonic: Optional[float] = None
         self._eskin_rows = []
         self._force_rows = []
 
@@ -95,7 +96,8 @@ class SessionRecorder(QtCore.QObject):
         self._force_rows = []
         self._start_wall_time = datetime.now()
         self._start_time_monotonic = time.time()
-        hotkey_trigger.send_start()
+        if task.kind != TaskKind.TARGET_FORCE:
+            hotkey_trigger.send_start()
         self._recording = True
         self._buffering = True
         self._segment_eskin_mark = 0
@@ -120,11 +122,36 @@ class SessionRecorder(QtCore.QObject):
         del self._force_rows[self._segment_force_mark:]
         self._buffering = False
 
+    def begin_emg_segment(self) -> None:
+        """Fire the EMG start hotkey for one hold attempt (target_force only;
+        called on every attempt, including retries of the same rep, so each
+        capture stays short regardless of how long stabilizing takes)."""
+        self._emg_segment_start_monotonic = time.time()
+        hotkey_trigger.send_start()
+
+    def end_emg_segment(self, rep_no: int) -> Optional[Path]:
+        """Fire the EMG stop hotkey to close the current attempt's capture
+        and link the resulting file into this trial's session folder as
+        ``emg_rep{rep_no}.txt``. Returns the linked path, or None if
+        EMG_Eyetracker_Tool wasn't running / no file appeared in time."""
+        hotkey_trigger.send_stop()
+        session_dir = self.data_dir / self._trial_id
+        return session_linker.link_emg_file(
+            self._emg_segment_start_monotonic, session_dir,
+            dest_name=f"emg_rep{rep_no}.txt")
+
+    def discard_emg_segment(self) -> None:
+        """Fire the EMG stop hotkey to reset capture for a failed attempt,
+        without linking a file (mirrors discard_current_segment for the
+        eskin/force buffers)."""
+        hotkey_trigger.send_stop()
+
     def stop_trial(self, aborted: bool = False, repetitions: Optional[list] = None) -> dict:
         if not self._recording:
             raise RuntimeError("No trial is currently recording")
         self._recording = False
-        hotkey_trigger.send_stop()
+        if self._task.kind != TaskKind.TARGET_FORCE:
+            hotkey_trigger.send_stop()
         stop_wall_time = datetime.now()
 
         session_dir = self.data_dir / self._trial_id
@@ -136,7 +163,12 @@ class SessionRecorder(QtCore.QObject):
         forces_path = session_dir / "forces.csv"
         self._write_forces_csv(forces_path)
 
-        emg_path = session_linker.link_emg_file(self._start_time_monotonic, session_dir)
+        if self._task.kind != TaskKind.TARGET_FORCE:
+            emg_path = session_linker.link_emg_file(self._start_time_monotonic, session_dir)
+        else:
+            # each rep already captured + linked its own EMG segment; no
+            # whole-trial hotkey/file for this task kind.
+            emg_path = None
 
         manifest = {
             "trial_id": self._trial_id,

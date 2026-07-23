@@ -1,0 +1,23 @@
+{
+  "trial_id": "PT_target_75_007_20260722_155050",
+  "subject_id": "PT_target_75",
+  "task_kind": "target_force",
+  "duration_s": 5.0,
+  "repetitions_total": 3,
+  "rest_s": 5.0,
+  "repetitions": [
+    {
+      "rep": 1,
+      "start_wall_time": "2026-07-22T15:51:13.972",
+      "end_wall_time": "2026-07-22T15:51:19.000"
+    }
+  ],
+  "target_force_n": 75.0,
+  "tolerance_n": 5.0,
+  "aborted": true,
+  "start_wall_time": "2026-07-22T15:50:57.829",
+  "stop_wall_time": "2026-07-22T15:51:43.462",
+  "eskin_csv": "C:\\Users\\piotr\\Documents\\GitHub\\robotics-summer-school\\data\\PT_target_75_007_20260722_155050\\eskin.csv",
+  "forces_csv": "C:\\Users\\piotr\\Documents\\GitHub\\robotics-summer-school\\data\\PT_target_75_007_20260722_155050\\forces.csv",
+  "emg_txt": "C:\\Users\\piotr\\Documents\\GitHub\\robotics-summer-school\\data\\PT_target_75_007_20260722_155050\\emg_raw.txt"
+}

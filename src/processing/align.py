@@ -1,18 +1,26 @@
 """Trial-level temporal alignment of the three recorded streams -- e-skin,
 force, and EMG -- onto one common time origin (the trial start), keeping each
 stream at its NATIVE sample rate. This is *alignment*, not fusion: no
-resampling onto a shared grid and no merged table (see ``correlate.py`` for
-that). The goal is an inspectable, per-stream view so the streams can be
-compared and validated against the labelled rep windows.
+resampling onto a shared grid and no merged table. The goal is an
+inspectable, per-stream view so the streams can be compared and validated
+against the labelled rep windows.
 
 Common time base
 ----------------
 ``forces.csv`` and ``eskin.csv`` both carry ``elapsed_s`` measured from the
 same trial-start instant (SessionRecorder sets one origin), so we use
-``elapsed_s`` directly. The EMG txt has no timestamps, so it is anchored at
-elapsed 0 (trial start) and timed off its nominal 2000 Hz rate. The manifest's
-rep windows (wall-clock) are converted to elapsed seconds relative to
-``start_wall_time`` -- the same origin -- so everything shares one axis.
+``elapsed_s`` directly. The EMG txt has no timestamps, so it is timed off its
+nominal 2000 Hz rate; where it is anchored depends on how it was captured:
+a whole-trial ``emg_raw.txt`` (max_effort trials, and older target_force
+recordings) is anchored at elapsed 0 (trial start), same as before. Newer
+target_force trials instead capture EMG per rep attempt (see ``tasks.py``),
+producing one ``emg_rep{N}.txt`` per successfully-completed rep; each such
+segment is anchored at that rep's own elapsed start time (from the manifest's
+rep windows), not at 0, and the segments are concatenated in rep order --
+``align_trial`` picks whichever shape is present on disk, preferring the
+per-rep files, and falls back to the single whole-trial file unchanged. The
+manifest's rep windows (wall-clock) are converted to elapsed seconds relative
+to ``start_wall_time`` -- the same origin -- so everything shares one axis.
 
 Sync caveat: EMG and the e-skin/force boards are independently triggered, so
 sample-perfect sync is not guaranteed. :func:`anchoring_offset` reports the
@@ -34,7 +42,7 @@ import pandas as pd
 from . import eskin as eskin_proc
 from . import emg_txt
 from . import forces as forces_proc
-from .emg_c3d import rms_envelope
+from .emg_txt import rms_envelope, combined_channel_envelope
 
 # EMG channel-quality thresholds (WaveX, uV)
 EMG_RAIL = 3290.0        # |value| at/above this == amplifier rail
@@ -43,12 +51,22 @@ EMG_REP_CORR_MIN = 0.30  # min correlation with the rep on/off pattern to be "re
 ENV_WINDOW_S = 0.10      # EMG envelope smoothing window
 GAP_THRESHOLD_S = 1.0    # a stream is "gappy" if consecutive samples exceed this
 
+# Rep-onset detection (max_effort: trims the reaction-time lead-in before the
+# user actually starts grasping, using the trial's own rest periods as a
+# noise baseline)
+ONSET_K = 3.0                   # baseline_mean + k*baseline_std threshold
+ONSET_MIN_DURATION_S = 0.05     # sustained-above-threshold duration
+ONSET_BASELINE_MARGIN_S = 0.5   # trims each inter-rep rest gap before using it
+                                 # as baseline noise (avoids a contraction's
+                                 # decay tail bleeding into the "rest" estimate)
+
 
 @dataclass
 class AlignedTrial:
     trial_dir: Path
     manifest: dict
     reps: list                        # [(rep_no, start_s, end_s), ...] in elapsed seconds
+    rep_onsets: list                  # [(rep_no, onset_s, onset_detected), ...] parallel to reps
 
     # EMG (native rate; may be absent)
     emg_present: bool
@@ -102,6 +120,58 @@ def _rep_mask(t: np.ndarray, reps) -> np.ndarray:
     for _, start_s, end_s in reps:
         mask[(t >= start_s) & (t <= end_s)] = 1.0
     return mask
+
+
+def _rest_gaps(reps: list, margin_s: float = ONSET_BASELINE_MARGIN_S) -> list:
+    """Inter-rep rest windows (end_s[i]+margin, start_s[i+1]-margin), dropped
+    if width <= 0. Empty for a single-rep trial (no gaps exist)."""
+    gaps = []
+    for (_, _, end_s), (_, next_start_s, _) in zip(reps, reps[1:]):
+        lo, hi = end_s + margin_s, next_start_s - margin_s
+        if hi > lo:
+            gaps.append((lo, hi))
+    return gaps
+
+
+def _detect_rep_onsets(emg: np.ndarray, emg_t: np.ndarray, reps: list, rate: float) -> list:
+    """Per-rep onset detection, trimming each max_effort rep window's
+    reaction-time lead-in. Only meaningful for a genuinely continuous
+    whole-trial recording -- for a gappy per-rep capture (target_force) there
+    is no in-file rest baseline to detect onset against, so this returns
+    (rep_no, start_s, False) for every rep without attempting detection.
+    Onset never trims past end_s."""
+    if not reps:
+        return []
+    if emg.size == 0 or coverage(emg_t) != "continuous":
+        return [(rep_no, start_s, False) for rep_no, start_s, _ in reps]
+
+    env = combined_channel_envelope(emg, rate)
+    gaps = _rest_gaps(reps)
+    baseline_samples = np.concatenate([env[(emg_t >= lo) & (emg_t <= hi)] for lo, hi in gaps]) \
+        if gaps else np.empty(0)
+    if baseline_samples.size == 0 or baseline_samples.std() == 0:
+        return [(rep_no, start_s, False) for rep_no, start_s, _ in reps]
+
+    baseline_mean = float(baseline_samples.mean())
+    baseline_std = float(baseline_samples.std())
+    threshold = baseline_mean + ONSET_K * baseline_std
+    min_samples = max(1, int(np.ceil(ONSET_MIN_DURATION_S * rate)))
+
+    onsets = []
+    for rep_no, start_s, end_s in reps:
+        sel = (emg_t >= start_s) & (emg_t <= end_s)
+        idx = np.flatnonzero(sel)
+        if idx.size == 0:
+            onsets.append((rep_no, start_s, False))
+            continue
+        above = env[idx] >= threshold
+        sustained = np.convolve(above, np.ones(min_samples), mode="valid") >= min_samples
+        hit = np.flatnonzero(sustained)
+        if hit.size:
+            onsets.append((rep_no, float(emg_t[idx[hit[0]]]), True))
+        else:
+            onsets.append((rep_no, start_s, False))
+    return onsets
 
 
 def coverage(t: np.ndarray) -> str:
@@ -176,24 +246,60 @@ def align_trial(trial_dir: Path) -> AlignedTrial:
     eskin_roi, roi_union = eskin_proc.roi_signal(eskin_frames, eskin_t, reps, rep_rois)
 
     # --- EMG (native 2000 Hz, optional) ---
-    emg_path = trial_dir / "emg_raw.txt"
-    if emg_path.exists():
-        emg_data = emg_txt.load_emg_txt(emg_path)
-        rate = emg_data.sample_rate_hz
-        emg = emg_data.signals
-        emg_t = np.arange(emg.shape[1]) / rate
+    # Prefer per-rep captures (emg_rep{N}.txt, one per successfully-completed
+    # rep -- see tasks.py), each anchored at that rep's own elapsed start.
+    # Falls back to a single whole-trial emg_raw.txt (max_effort trials, and
+    # older target_force recordings) if no per-rep files are present.
+    segments_t, segments_emg = [], []
+    canonical_rate, canonical_names = None, None
+    for rep_no, start_s, end_s in reps:
+        rep_path = trial_dir / f"emg_rep{rep_no}.txt"
+        if not rep_path.exists():
+            continue
+        try:
+            rep_data = emg_txt.load_emg_txt(rep_path)
+        except ValueError:
+            continue  # empty/truncated per-rep capture -- treat as missing
+        if canonical_rate is None:
+            canonical_rate = rep_data.sample_rate_hz
+            canonical_names = rep_data.channel_names
+        n = rep_data.signals.shape[1]
+        segments_t.append(start_s + np.arange(n) / canonical_rate)
+        segments_emg.append(rep_data.signals)
+
+    emg_present = False
+    if segments_emg:
+        emg_t = np.concatenate(segments_t)
+        emg = np.concatenate(segments_emg, axis=1)
+        rate, emg_names = canonical_rate, canonical_names
         emg_selected, emg_scores = select_emg_channels(emg, emg_t, reps, rate)
         anchor = anchoring_offset(emg, emg_selected, emg_t, reps, rate)
         emg_present = True
-        emg_names = emg_data.channel_names
     else:
-        emg_present = False
+        emg_path = trial_dir / "emg_raw.txt"
+        if emg_path.exists():
+            try:
+                emg_data = emg_txt.load_emg_txt(emg_path)
+            except ValueError:
+                emg_data = None  # e.g. an empty/truncated recording -- treat as absent
+            if emg_data is not None:
+                rate = emg_data.sample_rate_hz
+                emg = emg_data.signals
+                emg_t = np.arange(emg.shape[1]) / rate
+                emg_selected, emg_scores = select_emg_channels(emg, emg_t, reps, rate)
+                anchor = anchoring_offset(emg, emg_selected, emg_t, reps, rate)
+                emg_present = True
+                emg_names = emg_data.channel_names
+    if not emg_present:
         emg = np.empty((0, 0))
         emg_t = np.empty(0)
         emg_selected, emg_scores, anchor, emg_names = [], [], float("nan"), []
 
+    rep_onsets = _detect_rep_onsets(emg, emg_t, reps,
+                                     rate if emg_present else emg_txt.DEFAULT_SAMPLE_RATE_HZ)
+
     return AlignedTrial(
-        trial_dir=trial_dir, manifest=manifest, reps=reps,
+        trial_dir=trial_dir, manifest=manifest, reps=reps, rep_onsets=rep_onsets,
         emg_present=emg_present, emg_t=emg_t, emg=emg, emg_channel_names=emg_names,
         emg_selected=emg_selected, emg_scores=emg_scores, anchor_offset_s=anchor,
         force_t=force_t, f1=f1, f2=f2, f_combined=f_combined,

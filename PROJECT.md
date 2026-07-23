@@ -90,8 +90,9 @@ Code map (`src/processing/`):
   trial-start origin at **native rates (alignment, not fusion)**; EMG channel
   auto-selection + rep-window anchoring check; EMG optional.
 - `trial_plots.py` — overview (EMG env / force / e-skin-ROI, rep windows
-  shaded) + per-rep ROI figures.
-- `emg_c3d.py`, `correlate.py` — pre-existing (C3D EMG; a 100 Hz fused table).
+  shaded, per-rep onset markers) + per-rep ROI figures.
+- `emg_activation.py` — MVC-reference (`max_effort`) / %MVC-normalization
+  (`target_force`) library functions, built on `AlignedTrial.rep_onsets`.
 
 ### E-skin: ROI, not full-grid sum
 Summing all 256 taxels drowns the contact in baseline noise. Instead we sum an
@@ -124,9 +125,8 @@ This gates any e-skin→force model:
 ## Open questions / next steps
 
 - **Fusion stage** — after alignment, resample to a common ~100 Hz grid and
-  merge into one rep-labelled table (extend `correlate.py`, using `emg_txt` +
-  per-rep ROI). Decide sum vs **mean** over ROI (mean is comparable across reps,
-  since ROI sizes differ).
+  merge into one rep-labelled table (using `emg_txt` + per-rep ROI). Decide sum
+  vs **mean** over ROI (mean is comparable across reps, since ROI sizes differ).
 - **Calibration ramp** — collect + analyze it to quantify the saturation
   ceiling and an e-skin→N mapping.
 - **FMG experiment** — try the e-skin/FSR array on the forearm as an EMG

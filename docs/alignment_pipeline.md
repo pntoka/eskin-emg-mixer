@@ -5,10 +5,9 @@ loaded and put onto one common time axis for comparison.
 
 This stage does **alignment, not fusion**: every stream is kept at its own
 native sample rate and in its own array. There is *no* resampling onto a shared
-grid and *no* merged table here (that is what `src/processing/correlate.py`
-does). The output is an inspectable, per-stream view (`AlignedTrial`) plus two
-plots, so the streams can be eyeballed and validated against the labelled rep
-windows before any modelling.
+grid and *no* merged table here. The output is an inspectable, per-stream view
+(`AlignedTrial`) plus two plots, so the streams can be eyeballed and validated
+against the labelled rep windows before any modelling.
 
 Entry point: `python -m scripts.align_trial <trial_or_parent_folder>`
 Core module: [`src/processing/align.py`](../src/processing/align.py)
@@ -21,7 +20,7 @@ flowchart TD
         MAN["manifest.json<br/>task, rep windows, start_wall_time"]
         FCSV["forces.csv<br/>wall_time, elapsed_s, F1_N, F2_N"]
         ECSV["eskin.csv<br/>elapsed_s + 256 R##_C## taxels"]
-        ETXT["emg_raw.txt<br/>8 ch, channel-major blocks (optional)"]
+        ETXT["emg_raw.txt (max_effort) OR<br/>emg_rep{N}.txt per rep (target_force)<br/>8 ch, channel-major blocks (optional)"]
     end
 
     MAN --> ORIGIN{{"Common time origin = trial start<br/>rep windows converted to elapsed s"}}
@@ -64,8 +63,19 @@ flowchart TD
 **same** trial-start instant (the recorder sets one origin for the trial), so
 `elapsed_s` is used directly as the common axis for those two streams.
 
-`emg_raw.txt` has **no timestamps**, so the EMG is **anchored at elapsed 0**
-(trial start) and timed off its nominal **2000 Hz** rate: `t[i] = i / 2000`.
+The EMG txt has **no timestamps**, so it is timed off its nominal **2000 Hz**
+rate; where it is anchored depends on how it was captured. `max_effort` trials
+(and older `target_force` recordings) get one whole-trial `emg_raw.txt`,
+**anchored at elapsed 0** (trial start): `t[i] = i / 2000`. Newer
+`target_force` trials instead capture EMG **per hold attempt** (see
+`tasks.py`'s per-rep buffering, below) — the EMG start/stop hotkey fires at
+the start/end of every hold attempt, not once for the whole trial, so each
+capture stays short regardless of how long a rep's stabilizing retries take.
+This produces one `emg_rep{N}.txt` per successfully-completed rep, each
+anchored at **that rep's own elapsed start time** (from the manifest's rep
+windows) rather than 0; `align_trial` concatenates the segments in rep order,
+picking this per-rep shape when present and falling back to the single
+whole-trial file otherwise.
 
 The manifest's rep windows are wall-clock; they are converted to elapsed
 seconds relative to `start_wall_time` (the same origin) so the windows, force,
@@ -106,22 +116,63 @@ only that.
 
 ### 4. EMG — channel selection and validation
 
-- **Load** (`load_emg_txt`): `emg_raw.txt` is a sequence of blank-line-separated
-  blocks; each block has 8 channel-major lines; concatenating line *k* across
-  blocks rebuilds channel *k* → `(8, N)`.
+> **Why per-rep capture for `target_force`.** The EMG capture tool
+> (`EMG_Eyetracker_Tool`) buffers a whole start/stop window in memory and only
+> writes it to disk once, on stop — by its own admission "suitable for short
+> trials (1-2 mins)". `target_force` trials' unbounded stabilizing retries can
+> make a trial's real length balloon well past that, which was silently
+> truncating or losing EMG entirely. Capturing per hold-attempt instead keeps
+> every individual capture short. `max_effort` trials have no retry loop, stay
+> short, and are unaffected, so they keep one continuous whole-trial capture
+> (worth it: it also stays visible through rest periods, which per-rep capture
+> deliberately does not).
+
+- **Load** (`load_emg_txt`): each EMG txt file (`emg_raw.txt`, or one
+  `emg_rep{N}.txt` per rep) is a sequence of blank-line-separated blocks; each
+  block has 8 channel-major lines; concatenating line *k* across blocks
+  rebuilds channel *k* → `(8, N)`. For the per-rep case, `align_trial` loads
+  each rep's file separately and concatenates them in rep order.
 - **Channel selection** (`select_emg_channels`): a channel is "real" if it
   **rarely rails** (clip fraction `<= 15%`) **and** its rectified envelope
   **correlates with the rep on/off pattern** (`>= 0.30`). Disconnected/floating
   channels rail or don't track the reps and are dropped. All channel scores are
-  reported (never a silent drop).
+  reported (never a silent drop). *Known limitation:* per-rep-only capture
+  never records an "off" (rest) sample — every captured sample is inside a rep
+  by construction — so this on/off correlation heuristic may not discriminate
+  well for `target_force` trials recorded this way; revisit once real per-rep
+  data exists.
 - **Anchoring check** (`anchoring_offset`): cross-correlate the selected
   channels' envelope against the rep mask; the best lag (within ±6 s) is the
   residual mis-anchoring. `|offset| < 0.5 s` ⇒ well anchored. This uses the
   ground-truth rep windows, so it is robust even when force is sparse/gappy.
 
-EMG is **optional**: a trial without `emg_raw.txt` still aligns force + e-skin.
+EMG is **optional**: a trial without any `emg_raw.txt`/`emg_rep{N}.txt` still
+aligns force + e-skin.
 
-### 5. Outputs
+### 5. Rep onset detection (`rep_onsets`)
+
+A rep's nominal window (`start_wall_time`..`end_wall_time`) often includes a
+reaction-time lead-in before the user actually starts grasping — most visible
+in `max_effort` trials, whose one continuous `emg_raw.txt` still has real
+"rest" samples between reps to measure a noise baseline against. For each
+rep, `_detect_rep_onsets` filters the two active channels
+(`emg_txt.combined_channel_envelope` — bandpass → center → rectify → lowpass,
+per `project_overview.md`'s method) once over the whole trial, computes a
+baseline mean/std from the inter-rep rest gaps, and finds the first point
+within `[start_s, end_s]` where the envelope stays above
+`baseline_mean + 3·baseline_std` for ≥ 50 ms. That point becomes `onset_s`;
+the window is never trimmed past `end_s`. Stored as
+`AlignedTrial.rep_onsets`: `[(rep_no, onset_s, onset_detected), ...]`,
+parallel to `reps`.
+
+This only works for a genuinely continuous whole-trial recording — a gappy
+per-rep capture (`target_force`, current format) has no in-file rest sample to
+detect onset against (the capture already starts at hold), so `rep_onsets`
+falls back to `(rep_no, start_s, False)` for every rep without attempting
+detection. `plot_overview` marks each `onset_s` on the EMG panel (solid line
+= detected, dotted = fallback).
+
+### 6. Outputs
 
 - `AlignedTrial` — dataclass holding each stream at its native rate (separate).
 - `aligned_overview.png` — EMG envelope / force (`F1+F2`, `F1`, `F2`) / e-skin
