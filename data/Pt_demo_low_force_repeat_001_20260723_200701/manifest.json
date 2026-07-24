@@ -1,0 +1,17 @@
+{
+  "trial_id": "Pt_demo_low_force_repeat_001_20260723_200701",
+  "subject_id": "Pt_demo_low_force_repeat",
+  "task_kind": "free_form",
+  "duration_s": 0.0,
+  "repetitions_total": 1,
+  "rest_s": 0.0,
+  "repetitions": [],
+  "target_force_n": null,
+  "tolerance_n": null,
+  "aborted": false,
+  "start_wall_time": "2026-07-23T20:07:01.240",
+  "stop_wall_time": "2026-07-23T20:07:59.283",
+  "eskin_csv": "C:\\Users\\piotr\\Documents\\GitHub\\robotics-summer-school\\data\\Pt_demo_low_force_repeat_001_20260723_200701\\eskin.csv",
+  "forces_csv": "C:\\Users\\piotr\\Documents\\GitHub\\robotics-summer-school\\data\\Pt_demo_low_force_repeat_001_20260723_200701\\forces.csv",
+  "emg_txt": null
+}

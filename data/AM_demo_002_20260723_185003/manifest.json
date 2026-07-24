@@ -1,0 +1,17 @@
+{
+  "trial_id": "AM_demo_002_20260723_185003",
+  "subject_id": "AM_demo",
+  "task_kind": "free_form",
+  "duration_s": 0.0,
+  "repetitions_total": 1,
+  "rest_s": 0.0,
+  "repetitions": [],
+  "target_force_n": null,
+  "tolerance_n": null,
+  "aborted": false,
+  "start_wall_time": "2026-07-23T18:50:03.512",
+  "stop_wall_time": "2026-07-23T18:50:39.299",
+  "eskin_csv": "C:\\Users\\piotr\\Documents\\GitHub\\robotics-summer-school\\data\\AM_demo_002_20260723_185003\\eskin.csv",
+  "forces_csv": "C:\\Users\\piotr\\Documents\\GitHub\\robotics-summer-school\\data\\AM_demo_002_20260723_185003\\forces.csv",
+  "emg_txt": null
+}

@@ -1,0 +1,17 @@
+{
+  "trial_id": "YL_positive_y_003_20260723_162436",
+  "subject_id": "YL_positive_y",
+  "task_kind": "free_form",
+  "duration_s": 0.0,
+  "repetitions_total": 1,
+  "rest_s": 0.0,
+  "repetitions": [],
+  "target_force_n": null,
+  "tolerance_n": null,
+  "aborted": false,
+  "start_wall_time": "2026-07-23T16:24:36.145",
+  "stop_wall_time": "2026-07-23T16:25:36.996",
+  "eskin_csv": "C:\\Users\\piotr\\Documents\\GitHub\\robotics-summer-school\\data\\YL_positive_y_003_20260723_162436\\eskin.csv",
+  "forces_csv": "C:\\Users\\piotr\\Documents\\GitHub\\robotics-summer-school\\data\\YL_positive_y_003_20260723_162436\\forces.csv",
+  "emg_txt": "C:\\Users\\piotr\\Documents\\GitHub\\robotics-summer-school\\data\\YL_positive_y_003_20260723_162436\\emg_raw.txt"
+}

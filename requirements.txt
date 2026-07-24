@@ -8,3 +8,4 @@ scipy
 c3d
 matplotlib
 scikit-learn
+imageio-ffmpeg

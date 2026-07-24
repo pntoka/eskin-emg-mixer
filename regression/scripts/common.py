@@ -38,6 +38,15 @@ DATA_TRIALS = [
 # Legacy pre-manifest sessions from archive/ -- no task/rep metadata.
 ARCHIVE_TRIALS = ["archive_165516", "archive_173729"]
 
+# Dynamic-grasping trials split out of the single long
+# YL_grasp_dynamic_002_20260723_155859 recording (see
+# 05_split_dynamic_session.py) at rest-gap boundaries -- no manifest, same
+# shape as the archive/ sessions. Recorded through the current GUI, whose
+# ForceReader already applies config/force_bias_calibration.json's BIAS1/
+# BIAS2 at acquisition time, so (unlike ARCHIVE_TRIALS) no bias correction
+# is applied again here.
+DYNAMIC_TRIALS = sorted(p.name for p in DATA.glob("YL_dynamic_*") if p.is_dir())
+
 REP_PAD_S = 2.0          # padding kept around each labelled rep window
 ARCHIVE_ACTIVE_MARGIN = 3.0   # N above resting baseline to call "active"
 ARCHIVE_ACTIVE_PAD_S = 2.0
@@ -72,6 +81,12 @@ def iter_trials():
         # on top per the user's instruction.
         force["F1_N"] = force["F1_N"] - BIAS["BIAS1"]
         force["F2_N"] = force["F2_N"] - BIAS["BIAS2"]
+        yield t, eskin, force, None
+
+    for t in DYNAMIC_TRIALS:
+        d = DATA / t
+        eskin = pd.read_csv(d / "eskin.csv")
+        force = pd.read_csv(d / "forces.csv")
         yield t, eskin, force, None
 
 
